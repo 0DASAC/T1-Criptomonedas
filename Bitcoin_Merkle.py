@@ -2,8 +2,10 @@
 # All trees are constructed with hashes only, and not the raw data
 # If you want to implement them with raw data, you just add one extra level
 
+from optparse import Values
 from hash import *
 import math
+from operator import indexOf
 
 def merkle_parent(hash1, hash2):
     '''Takes the binary hashes and calculates the hash256'''
@@ -31,7 +33,7 @@ def merkle_parent_level(hashes):
         parent = merkle_parent(hashes[i], hashes[i + 1])
         # append parent to parent level
         parent_level.append(parent)
-    # return parent level, remove the extra stuff for consistency 
+    # return parent level, remove the extra stuff for consistency
     if (switch == 1):
         hashes.pop(-1)
     return parent_level
@@ -54,7 +56,7 @@ class MerkleProof:
         self.hashesOfInterest = hashesOfInterest
         self.nrLeaves = nrLeaves
         self.flags = flags
-        self.hashes = hashes    
+        self.hashes = hashes
 
 
 class MerkleTree:
@@ -92,20 +94,62 @@ class MerkleTree:
                 tmp = tmp + short
             tmp = tmp + '\n'
             items = tmp + items
-        
-        return items          
 
+        return items
 
-
-    def generate_proof(self,hashesOfInterest):
+    def generate_proof(self, hashesOfInterest):
         '''
         HW1: Implement the function that generates the flag bits for hashesOfInterest in the received list
-        And also the missing hashes needed to show that 
+        And also the missing hashes needed to show that
         If any of the hashes is absent from the leaves of the tree, just throw an error
         Returns an object of class MerkleProof
         !!!hashesOfInterest are always assumed to be leaves of the Merkle tree!!!
         '''
-        return True
+        indexOfInterest = [0] * len(self.hashes)
+        for i in range(0, len(hashesOfInterest)):
+            index = self.hashes.index(hashesOfInterest[i])
+            indexOfInterest[index] = 1
+
+        nodes = []
+        for i in range(0, len(indexOfInterest)):
+            bit = indexOfInterest[i]
+            if bit:
+                nodes.append( Node(i, 1,[], self.hashes[i], [self.hashes[i]]))
+            else:
+                nodes.append( Node(i, 0,[], self.hashes[i], [self.hashes[i]]))
+
+
+        while (len(nodes) > 1):
+            newLevel = []
+            for i in range(0, len(nodes), 2):
+                left = nodes[i]
+                right = nodes[i+1]
+                newIndex = (i + 1)//2
+                convinedHash = merkle_parent(left.hash, right.hash)
+                if (left.value == 0 and right.value == 0):
+                    newLevel.append(Node(newIndex, 0, [], convinedHash, [convinedHash]))
+                else:
+                    convinedFlags = ([left.value] + left.childsValues) + ([right.value] + right.childsValues)
+                    newNode = Node(newIndex, 1, convinedFlags, convinedHash, [])
+                    newNode.hashes = left.hashes + right.hashes
+                    newLevel.append(newNode)
+            nodes = newLevel
+
+        bitFlags = [nodes[0].value] + nodes[0].childsValues
+
+        test = MerkleProof(hashesOfInterest, len(self.hashes), bitFlags, nodes[0].hashes)
+
+
+        return test
+
+class Node:
+    def __init__(self, pos, value, childsValues, hash, hashes):
+        self.pos = pos
+        self.value = value
+        self.childsValues = childsValues
+        self.hash = hash
+        self.hashes = hashes
+
 
 class MerkleProof:
     def __init__(self, hashesOfInterest, nrLeaves = None, flags = None, hashes = None):
@@ -126,12 +170,12 @@ class SortedTree:
     def proof_of_non_inclusion(self,hash):
         '''
         HW1: Implement the function that generates a proof of non inclusion for a single hash
-        !!!the hash is assumed to be a leaf of the Merkle tree!!! 
+        !!!the hash is assumed to be a leaf of the Merkle tree!!!
         '''
         return True
 
 
-	
+
 class PartialMerkleTree:
 
     def __init__(self, total):
@@ -273,7 +317,7 @@ def verify_non_inclusion(hash, merkleRoot, proof):
     '''
     return True
 
-	
+
 ## Data for testing:
 
 
