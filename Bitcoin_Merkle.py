@@ -51,13 +51,6 @@ def merkle_root(hashes):
     # return the 1st item of the current level
     return current_level[0]
 
-class MerkleProof:
-    def __init__(self, hashesOfInterest, nrLeaves=None, flags=None, hashes=None):
-        self.hashesOfInterest = hashesOfInterest
-        self.nrLeaves = nrLeaves
-        self.flags = flags
-        self.hashes = hashes
-
 
 class MerkleTree:
     '''This is the full Merkle tree class
@@ -120,20 +113,35 @@ class MerkleTree:
 
 
         while (len(nodes) > 1):
+            orig_len = len(nodes)
+            if len(nodes) % 2 == 1:
+                nodes.append(_clone_node(nodes[-1], len(nodes)))
+
             newLevel = []
             for i in range(0, len(nodes), 2):
                 left = nodes[i]
                 right = nodes[i+1]
-                newIndex = (i + 1)//2
+
+                newIndex = i//2
                 convinedHash = merkle_parent(left.hash, right.hash)
+                right_was_real = (i + 1) < orig_len
                 if (left.value == 0 and right.value == 0):
                     newLevel.append(Node(newIndex, 0, [], convinedHash, [convinedHash]))
                 else:
-                    convinedFlags = ([left.value] + left.childsValues) + ([right.value] + right.childsValues)
-                    newNode = Node(newIndex, 1, convinedFlags, convinedHash, [])
-                    newNode.hashes = left.hashes + right.hashes
+                    if right_was_real:
+                        combined_flags = ([left.value] + left.childsValues) + ([right.value] + right.childsValues)
+                        new_hashes = left.hashes + right.hashes
+                    else:
+                        combined_flags = [left.value] + left.childsValues
+                        new_hashes = left.hashes
+                    newNode = Node(newIndex, 1, combined_flags, convinedHash, new_hashes)
                     newLevel.append(newNode)
             nodes = newLevel
+            # for flag in nodes:
+            #     print(flag.value)
+            #     print(flag.childsValues)
+            #     print(".")
+            # print("----")
 
         bitFlags = [nodes[0].value] + nodes[0].childsValues
 
@@ -149,6 +157,16 @@ class Node:
         self.childsValues = childsValues
         self.hash = hash
         self.hashes = hashes
+
+def _clone_node(n: "Node", new_pos: int) -> "Node":
+    # copia profunda de los campos relevantes
+    return Node(
+        new_pos,
+        0,
+        [],  # copia de flags hijos
+        n.hash,
+        []         # copia de la lista de hashes
+    )
 
 
 class MerkleProof:
@@ -321,6 +339,59 @@ def verify_non_inclusion(hash, merkleRoot, proof):
 ## Data for testing:
 
 
+# hex_hashes = [
+#     "9745f7173ef14ee4155722d1cbf13304339fd00d900b759c6f9d58579b5765fb",
+#     "5573c8ede34936c29cdfdfe743f7f5fdfbd4f54ba0705259e62f39917065cb9b",
+#     "82a02ecbb6623b4274dfcab82b336dc017a27136e08521091e443e62582e8f05",
+#     "507ccae5ed9b340363a0e6d765af148be9cb1c8766ccc922f83e4ae681658308",
+#     "a7a4aec28e7162e1e9ef33dfa30f0bc0526e6cf4b11a576f6c5de58593898330",
+#     "bb6267664bd833fd9fc82582853ab144fece26b7a8a5bf328f8a059445b59add",
+#     "ea6d7ac1ee77fbacee58fc717b990c4fcccf1b19af43103c090f601677fd8836",
+#     "457743861de496c429912558a106b810b0507975a49773228aa788df40730d41",
+#     "7688029288efc9e9a0011c960a6ed9e5466581abf3e3a6c26ee317461add619a",
+#     "b1ae7f15836cb2286cdd4e2c37bf9bb7da0a2846d06867a429f654b2e7f383c9",
+#     "9b74f89fa3f93e71ff2c241f32945d877281a6a50a6bf94adac002980aafe5ab",
+#     "b3a92b5b255019bdaf754875633c2de9fec2ab03e6b8ce669d07cb5b18804638",
+#     "b5c0b915312b9bdaedd2b86aa2d0f8feffc73a2d37668fd9010179261e25e263",
+#     "c9d52c5cb1e557b92c84c52e7c4bfbce859408bedffc8a5560fd6e35e10b8800",
+#     "c555bc5fc3bc096df0a0c9532f07640bfb76bfe4fc1ace214b8b228a1297a4c2",
+#     # "f9dbfafc3af3400954975da24eb325e326960a25b87fffe23eef3e7ed2fb610e",
+# ]
+
+
+# tree = MerkleTree(raw_hashes)
+
+# flags=[1,0,1,1,0,1,1,0,1,1,0,1,0]
+# hashes = ["6382df3f3a0b1323ff73f4da50dc5e318468734d6054111481921d845c020b93",
+#     "3b67006ccf7fe54b6cb3b2d7b9b03fb0b94185e12d086a42eb2f32d29d535918",
+#     "9b74f89fa3f93e71ff2c241f32945d877281a6a50a6bf94adac002980aafe5ab",
+#     "b3a92b5b255019bdaf754875633c2de9fec2ab03e6b8ce669d07cb5b18804638",
+#     "b5c0b915312b9bdaedd2b86aa2d0f8feffc73a2d37668fd9010179261e25e263",
+#     "c9d52c5cb1e557b92c84c52e7c4bfbce859408bedffc8a5560fd6e35e10b8800",
+#     "8636b7a3935a68e49dd19fc224a8318f4ee3c14791b3388f47f9dc3dee2247d1"
+# ]
+
+
+# r_hashes = [bytes.fromhex(h) for h in hashes]
+
+# hashesOfInterest = ["9b74f89fa3f93e71ff2c241f32945d877281a6a50a6bf94adac002980aafe5ab",
+#     "c555bc5fc3bc096df0a0c9532f07640bfb76bfe4fc1ace214b8b228a1297a4c2"
+# ]
+
+# r_interest = [bytes.fromhex(h) for h in hashesOfInterest]
+
+# proof = MerkleProof(r_interest,16,flags,r_hashes)
+
+# print(verify_inclusion(r_interest, tree.root, proof))
+
+# proof = tree.generate_proof(r_interest)
+# for hash in proof.hashes:
+#     print(hash.hex())
+# print(proof.flags)
+
+# print(verify_inclusion(r_interest, tree.root, proof))
+
+
 hex_hashes = [
     "9745f7173ef14ee4155722d1cbf13304339fd00d900b759c6f9d58579b5765fb",
     "5573c8ede34936c29cdfdfe743f7f5fdfbd4f54ba0705259e62f39917065cb9b",
@@ -329,40 +400,32 @@ hex_hashes = [
     "a7a4aec28e7162e1e9ef33dfa30f0bc0526e6cf4b11a576f6c5de58593898330",
     "bb6267664bd833fd9fc82582853ab144fece26b7a8a5bf328f8a059445b59add",
     "ea6d7ac1ee77fbacee58fc717b990c4fcccf1b19af43103c090f601677fd8836",
-    "457743861de496c429912558a106b810b0507975a49773228aa788df40730d41",
-    "7688029288efc9e9a0011c960a6ed9e5466581abf3e3a6c26ee317461add619a",
-    "b1ae7f15836cb2286cdd4e2c37bf9bb7da0a2846d06867a429f654b2e7f383c9",
-    "9b74f89fa3f93e71ff2c241f32945d877281a6a50a6bf94adac002980aafe5ab",
-    "b3a92b5b255019bdaf754875633c2de9fec2ab03e6b8ce669d07cb5b18804638",
-    "b5c0b915312b9bdaedd2b86aa2d0f8feffc73a2d37668fd9010179261e25e263",
-    "c9d52c5cb1e557b92c84c52e7c4bfbce859408bedffc8a5560fd6e35e10b8800",
-    "c555bc5fc3bc096df0a0c9532f07640bfb76bfe4fc1ace214b8b228a1297a4c2",
-    "f9dbfafc3af3400954975da24eb325e326960a25b87fffe23eef3e7ed2fb610e",
+    "457743861de496c429912558a106b810b0507975a49773228aa788df40730d41"
+    # "7688029288efc9e9a0011c960a6ed9e5466581abf3e3a6c26ee317461add619a",
+    # "b1ae7f15836cb2286cdd4e2c37bf9bb7da0a2846d06867a429f654b2e7f383c9",
+    # "9b74f89fa3f93e71ff2c241f32945d877281a6a50a6bf94adac002980aafe5ab",
+    # "b3a92b5b255019bdaf754875633c2de9fec2ab03e6b8ce669d07cb5b18804638",
+    # "b5c0b915312b9bdaedd2b86aa2d0f8feffc73a2d37668fd9010179261e25e263",
+    # "c9d52c5cb1e557b92c84c52e7c4bfbce859408bedffc8a5560fd6e35e10b8800",
+    # "c555bc5fc3bc096df0a0c9532f07640bfb76bfe4fc1ace214b8b228a1297a4c2",
+    # "f9dbfafc3af3400954975da24eb325e326960a25b87fffe23eef3e7ed2fb610e",
 ]
 
 raw_hashes = [bytes.fromhex(h) for h in hex_hashes]
 
 tree = MerkleTree(raw_hashes)
 
-flags=[1,0,1,1,0,1,1,0,1,1,0,1,0]
-hashes = ["6382df3f3a0b1323ff73f4da50dc5e318468734d6054111481921d845c020b93",
-"3b67006ccf7fe54b6cb3b2d7b9b03fb0b94185e12d086a42eb2f32d29d535918",
-"9b74f89fa3f93e71ff2c241f32945d877281a6a50a6bf94adac002980aafe5ab",
-"b3a92b5b255019bdaf754875633c2de9fec2ab03e6b8ce669d07cb5b18804638",
-"b5c0b915312b9bdaedd2b86aa2d0f8feffc73a2d37668fd9010179261e25e263",
-"c9d52c5cb1e557b92c84c52e7c4bfbce859408bedffc8a5560fd6e35e10b8800",
-"8636b7a3935a68e49dd19fc224a8318f4ee3c14791b3388f47f9dc3dee2247d1"
-]
-
-
-r_hashes = [bytes.fromhex(h) for h in hashes]
-
-hashesOfInterest = ["9b74f89fa3f93e71ff2c241f32945d877281a6a50a6bf94adac002980aafe5ab",
-"c9d52c5cb1e557b92c84c52e7c4bfbce859408bedffc8a5560fd6e35e10b8800"
+hashesOfInterest = [
+    "82a02ecbb6623b4274dfcab82b336dc017a27136e08521091e443e62582e8f05",
+    "a7a4aec28e7162e1e9ef33dfa30f0bc0526e6cf4b11a576f6c5de58593898330",
+    "457743861de496c429912558a106b810b0507975a49773228aa788df40730d41"
 ]
 
 r_interest = [bytes.fromhex(h) for h in hashesOfInterest]
 
-proof = MerkleProof(r_interest,16,flags,r_hashes)
+proof = tree.generate_proof(r_interest)
+for hash in proof.hashes:
+    print(hash.hex())
+print(proof.flags)
 
 print(verify_inclusion(r_interest, tree.root, proof))
