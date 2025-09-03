@@ -1,7 +1,8 @@
 # Most of the code is taken from Jimmy Song's book 'Programming Bitcoin'
 # All trees are constructed with hashes only, and not the raw data
 # If you want to implement them with raw data, you just add one extra level
-
+#
+import bisect
 from hash import *
 import math
 
@@ -176,25 +177,35 @@ class MerkleProof:
 
 
 
-class SortedTree:
+class SortedTree(MerkleTree):
     '''
     This will be a sorted Merkle Tree which will allow a proof of non-inclusion
     Copy/paste any method from the other classes that you will need
 
     '''
 
+    def __init__(self, hashes):
+        super().__init__(sorted(hashes))
+
     def proof_of_non_inclusion(self,hash):
         '''
         HW1: Implement the function that generates a proof of non inclusion for a single hash
         !!!the hash is assumed to be a leaf of the Merkle tree!!!
+
         '''
-        return True
+        hashesOfInterest = []
+        hashIndex = bisect.bisect_left(self.hashes, hash)
+        if (hashIndex == 0):
+            hashesOfInterest.append(self.hashes[0])
+        elif (hashIndex == len(self.hashes) + 1):
+            hashesOfInterest.append(self.hashes[-1])
+        else:
+            hashesOfInterest.append(self.hashes[hashIndex-1])
+            hashesOfInterest.append(self.hashes[hashIndex])
 
-class NodeNonInclusion:
-    def __init__(self, depth, hash):
-        self.depth = depth
-        self.hash = hash
+        proof = super().generate_proof(hashesOfInterest)
 
+        return proof
 
 class PartialMerkleTree:
 
@@ -330,52 +341,38 @@ def verify_inclusion(hashesOfInterest, merkleRoot, proof):
     return (tree.root() == merkleRoot)
 
 
-class PartialMerkleTreeNonInclusion:
-    def __init__(self, proof):
-        self.lengthOfLeaves = proof.nrLeaves
-        self.bitFlags = proof.flags
-        self.hashes = proof.hashes
-        self.treeHeight = math.ceil(math.log(self.lengthOfLeaves, 2))
-        self.hashesIndex = {}
-        self.currentIndex = 0
-
-    def GetHash(self, depth):
-        currentBit = self.bitFlags.pop(0)
-        nodeHash = None
-        if (currentBit == 0):
-            difDepth = self.treeHeight - depth
-            self.currentIndex += (2**difDepth)
-            nodeHash = self.hashes.pop(0)
-        elif (depth < self.treeHeight):
-            left = self.GetHash(depth + 1)
-            if (self.currentIndex == self.lengthOfLeaves):
-                nodeHash =  merkle_parent(left, left)
-            else:
-                right = self.GetHash(depth + 1)
-                nodeHash =  merkle_parent(left, right)
-        else:
-            nodeHash = self.hashes.pop(0)
-            self.hashesIndex[nodeHash] = self.currentIndex
-            self.currentIndex += 1
-        return nodeHash
-
 def verify_non_inclusion(hash, merkleRoot, proof):
     '''
     The method receives a hash, a Merkle root, and a proof that hash does not belong to this Merkle root
     the proof is of type MerkleProof
 
     '''
+    hashesOfInterest = proof.hashesOfInterest
+    hashes = proof.hashes
 
-    tree = PartialMerkleTreeNonInclusion(proof)
-    root = tree.GetHash(0)
-    hashesIndex = tree.hashesIndex
+    if (len(hashesOfInterest) == 2):
+        if (hash > hashesOfInterest[1]) or (hash < hashesOfInterest[0]):
+            return False
+        leftIndex = hashes.index(hashesOfInterest[0])
+        rightIndex = hashes.index(hashesOfInterest[1])
+        if ((rightIndex - leftIndex) != 1):
+            return False
+    else:
+        if (hash < hashesOfInterest[0]):
+          if (hashes[0] != hashesOfInterest[0]):
+                return False
+        else:
+            if (hashes[-1] != hashesOfInterest[0]):
+                return False
 
-    if (merkleRoot != root):
-        return False
-    elif ()
 
+    leaves = proof.nrLeaves
+    flags = proof.flags
 
-    return True
+    tree = PartialMerkleTree(leaves)
+    tree.populate_tree(flags,hashes)
+
+    return (tree.root() == merkleRoot)
 
 
 ## Data for testing:
