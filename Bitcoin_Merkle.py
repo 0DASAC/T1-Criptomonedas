@@ -175,6 +175,28 @@ class MerkleProof:
         self.flags = flags
         self.hashes = hashes
 
+    def __str__(self):
+        def bh(b):  # bytes -> hex corto
+            return b.hex()
+
+        interests_hex = [bh(h) for h in self.hashesOfInterest]
+        hashes_hex    = [bh(h) for h in self.hashes]
+
+        lines = []
+        lines.append("==========================")
+        lines.append(f"Interests ({len(interests_hex)}):")
+        for h in interests_hex:
+            lines.append(f"  - {h}")
+        lines.append(f"nrLeaves: {self.nrLeaves}")
+        lines.append(f"flags ({len(self.flags)}): {self.flags}")
+        lines.append("--------------------------")
+        lines.append(f"hashes ({len(hashes_hex)}):")
+        for h in hashes_hex:
+            lines.append(f"  - {h}")
+        lines.append("==========================")
+        return "\n".join(lines)
+
+
 
 
 class SortedTree(MerkleTree):
@@ -197,7 +219,7 @@ class SortedTree(MerkleTree):
         hashIndex = bisect.bisect_left(self.hashes, hash)
         if (hashIndex == 0):
             hashesOfInterest.append(self.hashes[0])
-        elif (hashIndex == len(self.hashes) + 1):
+        elif (hashIndex == len(self.hashes)):
             hashesOfInterest.append(self.hashes[-1])
         else:
             hashesOfInterest.append(self.hashes[hashIndex-1])
@@ -347,9 +369,12 @@ def verify_non_inclusion(hash, merkleRoot, proof):
     the proof is of type MerkleProof
 
     '''
+    print(proof)
     hashesOfInterest = proof.hashesOfInterest
     hashes = proof.hashes
 
+    if  hash in hashesOfInterest:
+        return False
     if (len(hashesOfInterest) == 2):
         if (hash > hashesOfInterest[1]) or (hash < hashesOfInterest[0]):
             return False
@@ -427,7 +452,7 @@ hex_hashes = [
 
 raw_hashes = [bytes.fromhex(h) for h in hex_hashes]
 
-tree = MerkleTree(raw_hashes)
+tree = SortedTree(raw_hashes)
 
 hashesOfInterest = [
     "82a02ecbb6623b4274dfcab82b336dc017a27136e08521091e443e62582e8f05",
@@ -437,9 +462,10 @@ hashesOfInterest = [
 
 r_interest = [bytes.fromhex(h) for h in hashesOfInterest]
 
-proof = tree.generate_proof(r_interest)
-for hash in proof.hashes:
-    print(hash.hex())
-print(proof.flags)
+r_non = bytes.fromhex(
+    "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+)
 
-print(verify_inclusion(r_interest, tree.root, proof))
+proof = tree.proof_of_non_inclusion(r_non)
+
+print(verify_non_inclusion(r_non, tree.root, proof))
